@@ -3,6 +3,7 @@ recursive-include googleapiclient *.json *.py
 include CHANGELOG
 include LICENSE
 include README
+include README.md
 include FAQ
 include setpath.sh
 recursive-include tests *

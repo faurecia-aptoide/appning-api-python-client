@@ -6,6 +6,8 @@ The **Appning API** enables developers to **interact with Appning services** fro
 
 All Appning endpoints are authenticated using **JWT Bearer tokens** signed locally with **RS256**. This library is based on the Google API Python Client and is adapted for use with Appning services.
 
+> This library is an **unofficial fork** of Google’s `google-api-python-client` library and is **maintained independently by Appning**. It is not an official Google product and is provided under the same Apache License 2.0 terms as the upstream project.
+
 ## Requirements
 
 - [Python 3.7 or higher](https://www.python.org/)
@@ -25,7 +27,7 @@ pip install -e .
 Or install the published package:
 
 ```sh
-pip install google-api-python-client
+pip install appning-api-python-client
 ```
 
 This library relies on `google-auth` and `google-auth-httplib2` for authentication and HTTP transport. They are installed automatically as dependencies.
