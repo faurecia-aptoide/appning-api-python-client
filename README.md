@@ -189,7 +189,7 @@ See [Service Account Authentication](docs/oauth-server.md#responses-and-troubles
 
 ## Documentation
 
-The [docs/](docs/) folder contains [Getting Started](docs/start.md), [Installation](docs/install.md), [Service Account Authentication](docs/oauth-server.md), and the [Android Publisher alignment plan](docs/ANDROID_PUBLISHER_ALIGNMENT_PLAN.md).
+The [docs/](docs/) folder contains [Getting Started](docs/start.md), [Installation](docs/install.md), [Service Account Authentication](docs/oauth-server.md).
 
 ## Contributing
 
