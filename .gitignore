@@ -7,6 +7,7 @@ dist/
 
 # Test files
 .nox/
+.dev.py
 
 # Coverage files
 .coverage
