@@ -26,7 +26,7 @@ Usage:
   $ python example_custom_endpoint.py
 """
 
-__author__ = "googleapis-packages@google.com"
+__author__ = "nuno.gomes@google.com"
 
 import json
 import os
