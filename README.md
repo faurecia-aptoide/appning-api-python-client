@@ -1,120 +1,198 @@
-# Google API Client
+# Appning API Client Library for Python
 
-[![PyPI version](https://badge.fury.io/py/google-api-python-client.svg)](https://badge.fury.io/py/google-api-python-client)
+**License:** Apache 2.0
 
-This is the [Google API Python client library](https://cloud.google.com/apis/docs/client-libraries-explained#google_api_client_libraries)
-for Google's discovery based APIs. To get started, please see the
-[docs folder](https://github.com/googleapis/google-api-python-client/blob/main/docs/README.md).
+The **Appning API** enables developers to **interact with Appning services** from their own systems (server-to-server). This client library is focused on **Android Publisher** with custom endpoints.
 
-This library is considered complete and is in maintenance mode. This means
-that we will address critical bugs and security issues but will not add any
-new features.
+All Appning endpoints are authenticated using **JWT Bearer tokens** signed locally with **RS256**. This library is based on the Google API Python Client and is adapted for use with Appning services.
 
-This library is officially supported by Google.  However, the maintainers of
-this repository recommend using [Cloud Client Libraries for Python](https://github.com/googleapis/google-cloud-python),
-where possible, for new code development. For more information, please visit
-[Client Libraries Explained](https://cloud.google.com/apis/docs/client-libraries-explained).
+## Requirements
 
-## Version 2.0 Release
-The 2.0 release of `google-api-python-client` includes a substantial reliability 
-improvement, compared with 1.x, as discovery documents are now cached in the library 
-rather than fetched dynamically. It is highly recommended to upgrade from v1.x to v2.x.
-
-Only python 3.7 and newer is supported. If you are not able to upgrade python, then
-please continue to use version 1.x as we will continue supporting python 2.7+ in
-[v1](https://github.com/googleapis/google-api-python-client/tree/v1).
-
-Discovery documents will no longer be retrieved dynamically when
-you call `discovery.build()`. The discovery documents will instead be retrieved
-from the client library directly. New versions of this library are released weekly.
-As a result of caching the discovery documents, the size of this package is at least 
-50 MB larger compared to the previous version. 
-
-Please see the [Migration Guide](https://github.com/googleapis/google-api-python-client/blob/main/UPGRADING.md)
-for more information.
-
-## Documentation
-
-See the [docs folder](https://github.com/googleapis/google-api-python-client/blob/main/docs/README.md) for more detailed instructions and additional documentation.
-
-## Other Google API libraries
-
-The maintainers of this repository recommend using
-[Cloud Client Libraries for Python](https://github.com/googleapis/google-cloud-python),
-where possible, for new code development due to the following reasons:
-
-With [Cloud Client Libraries for Python](https://github.com/googleapis/google-cloud-python):
-- There is a separate client library for each API, so you can choose
-which client libraries to download. Whereas, `google-api-python-client` is a
-single client library for all APIs. As a result, the total package size for
-`google-api-python-client` exceeds 50MB.
-- There are stricter controls for breaking changes to the underlying APIs
-as each client library is focused on a specific API.
-- There are more features in these Cloud Client Libraries as each library is
-focused on a specific API, and in some cases, the libraries are owned by team
-who specialized in that API.
-- Developers will benefit from intellisense.
-
-For more information, please visit
-[Client Libraries Explained](https://cloud.google.com/apis/docs/client-libraries-explained).
-
-Although there are many benefits to moving to
-[Cloud Client Libraries for Python](https://github.com/googleapis/google-cloud-python),
-the maintainers want to emphasize that `google-api-python-client` will continue
-to be supported.
-
-For Google Ads API, we recommend using [Google Ads API Client Library for Python](https://github.com/googleads/google-ads-python/).
-
-For Google Firebase Admin API, we recommend using [Firebase Admin Python SDK](https://github.com/firebase/firebase-admin-python).
+- [Python 3.7 or higher](https://www.python.org/)
 
 ## Installation
 
-Install this library in a [virtualenv](https://virtualenv.pypa.io/en/latest/) using pip. virtualenv is a tool to
-create isolated Python environments. The basic problem it addresses is one of
-dependencies and versions, and indirectly permissions.
+### pip
 
-With virtualenv, it's possible to install this library without needing system
-install permissions, and without clashing with the installed system
-dependencies.
+The preferred method is via [pip](https://pip.pypa.io/). From the project root:
 
-### Mac/Linux
-
-```bash
-pip3 install virtualenv
-virtualenv <your-env>
-source <your-env>/bin/activate
-<your-env>/bin/pip install google-api-python-client
+```sh
+python3 -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+pip install -e .
 ```
 
-### Windows
+Or install the published package:
 
-```batch
-pip install virtualenv
-virtualenv <your-env>
-<your-env>\Scripts\activate
-<your-env>\Scripts\pip.exe install google-api-python-client
+```sh
+pip install google-api-python-client
 ```
 
-## Supported Python Versions
+This library relies on `google-auth` and `google-auth-httplib2` for authentication and HTTP transport. They are installed automatically as dependencies.
 
-Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12 and 3.13, 3.14 are fully supported and tested. This library may work on later versions of 3, but we do not currently run tests against those versions.
+## Authentication (JWT Bearer)
 
-## Unsupported Python Versions
+### Obtain API access credentials
 
-Python < 3.7
+Obtain API access credentials from the **Developer Portal**:
 
-## Third Party Libraries and Dependencies
+- **https://developers.appning.com/backoffice/settings/api-access-credentials**
 
-The following libraries will be installed when you install the client library:
-* [httplib2](https://github.com/httplib2/httplib2)
-* [uritemplate](https://github.com/sigmavirus24/uritemplate)
+From there you can download a credentials file (e.g. `serviceAccount.json`) with this structure:
 
-For development you will also need the following libraries:
-* [WebTest](https://pypi.org/project/WebTest/)
-* [pyopenssl](https://pypi.python.org/pypi/pyOpenSSL)
+```json
+{
+    "kid": "the-key-id",
+    "privateKeyPem": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+    "clientId": "the-client-id"
+}
+```
+
+- **`privateKeyPem`** is **private** and must remain local (never sent to the server).
+- **`kid`** identifies the key used to sign the JWT.
+- **`clientId`** identifies the client and must be used as the JWT **`iss`** and **`sub`** claims.
+
+### JWT requirements
+
+- **Required claims:** The JWT must include `iss` and `sub`, both set to the client’s **`clientId`**.
+- **Token validity:** The server only accepts tokens with a **maximum validity of 15 minutes** (`exp - iat <= 900` seconds). The JWT must include `iat` and `exp` (Unix epoch seconds). The library handles this when you use `JwtBearerCredentials` with the credentials file.
+
+For full details (clock skew, error responses), see [Service Account Authentication](docs/oauth-server.md).
+
+### Basic Usage Example
+
+See [`samples/androidpublisher/example_custom_endpoint.py`](samples/androidpublisher/example_custom_endpoint.py) for a complete example.
+
+```python
+import json
+import os
+import time
+import google_auth_httplib2
+import httplib2
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import set_user_agent
+from googleapiclient.jwt_bearer_credentials import JwtBearerCredentials
+
+service_account_file = 'serviceAccount.json'
+if not os.path.exists(service_account_file):
+    raise FileNotFoundError("serviceAccount.json not found. Obtain credentials from the developer portal.")
+
+with open(service_account_file, 'r') as f:
+    data = json.load(f)
+cred_kwargs = {'kid': data['kid'], 'private_key_pem': data['privateKeyPem']}
+if data.get('clientId'):
+    cred_kwargs['client_id'] = data['clientId']
+credentials = JwtBearerCredentials(**cred_kwargs)
+
+custom_endpoint = 'https://product.faa.faurecia-aptoide.com/api/8.20200601/'
+base_http = set_user_agent(httplib2.Http(timeout=30), 'appning-api-python-client/androidpublisher')
+authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=base_http)
+
+service = build('androidpublisher', 'v3', http=authorized_http, client_options={'api_endpoint': custom_endpoint})
+package_name = "com.example.app"
+batch_request_body = {"requests": [{...}]}  # See sample for full body
+
+response = service.monetization().onetimeproducts().batchUpdate(
+    packageName=package_name, body=batch_request_body
+).execute()
+```
+
+## Available endpoints
+
+| Service          | Method | Description |
+|------------------|--------|-------------|
+| Android Publisher | POST   | Batch create/update one-time products (monetization): `applications/{packageName}/oneTimeProducts:batchUpdate` |
+
+The base URL for the Appning product API is typically `https://product.faa.faurecia-aptoide.com/api/8.20240517` (or the version your account uses). Set it via `client_options={'api_endpoint': '...'}` when building the service.
+
+## Examples
+
+- **Android Publisher batch update:** [samples/androidpublisher/example_custom_endpoint.py](samples/androidpublisher/example_custom_endpoint.py) — JWT Bearer auth and batch updates of one-time products (monetization).
+
+## Testing
+
+### How to run tests
+
+1. **Use a virtual environment** (recommended):
+
+   ```sh
+   python3 -m venv .venv
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   ```
+
+2. **Install the package in editable mode and test dependencies:**
+
+   The test suite requires several dependencies (e.g. `pytest`, `parameterized`, `mox`, `webtest`). Install them all with:
+
+   ```sh
+   pip install -e .
+   pip install -r dev-requirements.txt
+   ```
+
+   Without `dev-requirements.txt`, collection may fail with `ModuleNotFoundError` (e.g. `No module named 'parameterized'`).
+
+3. **Run the test suite:**
+
+   From the project root:
+
+   ```sh
+   pytest tests/
+   ```
+
+   Or with Python module (if `pytest` is not on your PATH):
+
+   ```sh
+   python -m pytest tests/
+   ```
+
+   Optional: run with coverage:
+
+   ```sh
+   pytest tests/ --cov=googleapiclient --cov-report=term-missing
+   ```
+
+4. **Run the Android Publisher sample (manual/integration):**
+
+   Requires a valid `serviceAccount.json` in the project root (or path used by the sample). This calls a real or custom endpoint:
+
+   ```sh
+   cd samples/androidpublisher
+   python example_custom_endpoint.py
+   ```
+
+### What is tested
+
+- **Unit tests** (`tests/`) — Core client library (discovery, HTTP, auth, mocks). No live API calls.
+- **Android Publisher sample** — Manual verification against a real or custom endpoint; not run in CI unless configured with credentials.
+
+Credential-related deprecation warnings from dependencies (e.g. `credentials_file`) are suppressed in tests. For Appning, **obtain credentials from the [Developer Portal](https://developers.appning.com/backoffice/settings/api-access-credentials)** (JWT Bearer / `serviceAccount.json`), not via Application Default Credentials or `credentials_file`.
+
+### Code style
+
+```sh
+flake8 googleapiclient/ tests/
+autopep8 --in-place --recursive googleapiclient/ tests/
+```
+
+## API responses and troubleshooting
+
+- **200 OK** — Request processed successfully.
+- **400 Bad Request** — Invalid payload or validation failure (missing required fields, invalid types).
+- **401 Unauthorized** — Authentication failure: missing or malformed `Authorization` header, malformed JWT, invalid signature, unknown/revoked `kid`, expired token, or token validity &gt; 15 minutes. Ensure `iss` and `sub` equal your `clientId`.
+- **403 Forbidden** — Token valid but caller lacks permission for this operation; check permissions for your `clientId` at [developers.appning.com](https://developers.appning.com).
+- **404 Not Found** — Resource not found (e.g. package not available for monetization or not under your account).
+
+See [Service Account Authentication](docs/oauth-server.md#responses-and-troubleshooting) for more detail.
+
+## Documentation
+
+The [docs/](docs/) folder contains [Getting Started](docs/start.md), [Installation](docs/install.md), [Service Account Authentication](docs/oauth-server.md), and the [Android Publisher alignment plan](docs/ANDROID_PUBLISHER_ALIGNMENT_PLAN.md).
 
 ## Contributing
 
-Please see our [Contribution Guide](https://github.com/googleapis/google-api-python-client/blob/main/CONTRIBUTING.rst).
-In particular, we love pull requests - but please make sure to sign
-the contributor license agreement.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests are welcome.
+
+## Support
+
+For issues with the library, open an issue in the project’s issue tracker with a minimal example and error details. For API-specific questions, refer to the relevant API documentation.

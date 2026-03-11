@@ -1,125 +1,123 @@
-# Using OAuth 2.0 for Server to Server Applications
+# Service Account Authentication (Server-to-Server)
 
-The Google APIs Client Library for Python supports using OAuth 2.0 for server-to-server interactions such as those between a web application and a Google service. For this scenario you need a service account, which is an account that belongs to your application instead of to an individual end user. Your application calls Google APIs on behalf of the service account, so users aren't directly involved. This scenario is sometimes called "two-legged OAuth," or "2LO." (The related term "three-legged OAuth" refers to scenarios in which your application calls Google APIs on behalf of end users, and in which user consent is sometimes required.)
+This library supports server-to-server authentication using service accounts. For the Android Publisher API, this is the standard approach: your application authenticates with a JWT Bearer token (signed with RS256). No end-user consent is required.
 
-Typically, an application uses a service account when the application uses Google APIs to work with its own data rather than a user's data. For example, an application that uses [Google Cloud Datastore](https://cloud.google.com/datastore/) for data persistence would use a service account to authenticate its calls to the Google Cloud Datastore API.
+## Obtain API access credentials
 
-If you have a G Suite domain—if you use [G Suite](https://gsuite.google.com/), for example—an administrator of the G Suite domain can authorize an application to access user data on behalf of users in the G Suite domain. For example, an application that uses the [Google Calendar API](https://developers.google.com/calendar/) to add events to the calendars of all users in a G Suite domain would use a service account to access the Google Calendar API on behalf of users. Authorizing a service account to access data on behalf of users in a domain is sometimes referred to as "delegating domain-wide authority" to a service account.
+To obtain API access credentials, go to the **Developer Portal**:
 
-> **Note:** When you use [G Suite Marketplace](https://www.google.com/enterprise/marketplace/) to install an application for your domain, the required permissions are automatically granted to the application. You do not need to manually authorize the service accounts that the application uses.
+- **https://developers.appning.com/backoffice/settings/api-access-credentials**
 
-> **Note:** Although you can use service accounts in applications that run from a G Suite domain, service accounts are not members of your G Suite account and aren't subject to domain policies set by G Suite administrators. For example, a policy set in the G Suite Admin console to restrict the ability of G Suite end users to share documents outside of the domain would not apply to service accounts. Similarly, that policy would prevent users from sharing documents with service accounts, because service acounts are always outside of the domain. If you're using G Suite domain-wide delegation, this isn't relevant to you - you are accessing APIs while acting as a domain user, not as the service account itself.
+From there you can download a credentials file (e.g. `serviceAccount.json`) with this structure:
 
-This document describes how an application can complete the server-to-server OAuth 2.0 flow by using the Google APIs Client Library for Python.
+```json
+{
+  "kid": "the-key-id",
+  "privateKeyPem": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "clientId": "the-client-id"
+}
+```
+
+- **`privateKeyPem`** is **private** and must remain local (**never** sent to the server).
+- **`kid`** identifies the key used to sign the JWT.
+- **`clientId`** identifies the client and must be used as the value for the JWT **`iss`** and **`sub`** claims.
+
+## JWT requirements
+
+### Required claims (`iss` / `sub`)
+
+The JWT **must** include:
+
+- **`iss`**: must be equal to the client’s **`clientId`**
+- **`sub`**: must be equal to the client’s **`clientId`**
+
+When you use `JwtBearerCredentials` with `client_id` set from `serviceAccount.json`, the library sets these claims for you.
+
+### Token validity (policy)
+
+The server **only accepts tokens with a maximum validity of 15 minutes**:
+
+- The JWT **must** include `iat` and `exp` (Unix epoch seconds).
+- The server validates:
+  - `exp` has not expired
+  - `iat` is not “in the future” (with clock skew tolerance)
+  - **`exp - iat <= 900`** seconds (15 minutes)
+
+A clock skew tolerance of around 60 seconds on the server is recommended. The library generates short-lived tokens when you make requests.
 
 ## Overview
 
-To support server-to-server interactions, first create a service account for your project in the API Console. If you want to access user data for users in your G Suite domain, then delegate domain-wide access to the service account.
+1. Obtain service account credentials (`serviceAccount.json`) from the [Developer Portal](https://developers.appning.com/backoffice/settings/api-access-credentials).
+2. Load the client with those credentials (JWT Bearer) using `JwtBearerCredentials`.
+3. Build the Android Publisher service and call the API.
 
-Then, your application prepares to make authorized API calls by using the service account's credentials to request an access token from the OAuth 2.0 auth server.
+## Using the credentials
 
-Finally, your application can use the access token to call Google APIs.
-
-## Creating a service account
-
-https://cloud.google.com/iam/docs/creating-managing-service-account-keys#creating_service_account_keys
-
-
-## Delegating domain-wide authority to the service account
-
-If your application runs in a G Suite domain and accesses user data, the service account that you created needs to be granted access to the user data that you want to access.
-
-https://developers.google.com/admin-sdk/directory/v1/guides/delegation
-
-## Preparing to make an authorized API call
-
-After you obtain the client email address and private key from the API Console, complete the following steps:
-
-1. Install the required libraries:
-
-    ```sh
-    pip install google-auth google-auth-httplib2 google-api-python-client
-    ```
-
-1. Create a `Credentials` object from the service account's credentials and the scopes your application needs access to. For example:
-
-### Examples
-
-#### Application Default Credentials
-
-Application Default Credentials abstracts authentication across the different Google Cloud Platform hosting environments. When running on any Google Cloud hosting environment or when running locally with the Google Cloud SDK installed, `google.auth.default()` can automatically determine the credentials from the environment. See https://google.aip.dev/auth/4110 and https://googleapis.dev/python/google-auth/latest/user-guide.html#application-default-credentials for details.
+Create JWT Bearer credentials from the service account file and use them with an authorized HTTP client:
 
 ```python
-import google.auth
+import json
+import google_auth_httplib2
+import httplib2
+from googleapiclient.jwt_bearer_credentials import JwtBearerCredentials
+from googleapiclient.http import set_user_agent
 
-SCOPES = ['https://www.googleapis.com/auth/sqlservice.admin']
+with open('/path/to/serviceAccount.json', 'r') as f:
+    data = json.load(f)
 
-credentials, project = google.auth.default(scopes=SCOPES)
+credentials = JwtBearerCredentials(
+    kid=data['kid'],
+    private_key_pem=data['privateKeyPem'],
+    client_id=data.get('clientId')  # required for iss/sub
+)
+
+http = set_user_agent(httplib2.Http(timeout=30), 'appning-api-python-client/androidpublisher')
+authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=http)
 ```
 
-#### Other Platforms
-Obtain a service account key file  by following this guide: 
-https://cloud.google.com/iam/docs/creating-managing-service-account-keys#creating_service_account_keys
+For Appning/Android Publisher with a custom endpoint, use the JWT Bearer credentials as above (not Application Default Credentials).
+
+## Calling the Android Publisher API
+
+Build the service object and make requests:
+
 ```python
-from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
-SCOPES = ['https://www.googleapis.com/auth/sqlservice.admin']
-SERVICE_ACCOUNT_FILE = '/path/to/service.json'
+service = build(
+    'androidpublisher',
+    'v3',
+    http=authorized_http,
+    client_options={'api_endpoint': 'https://product.faa.faurecia-aptoide.com/api/8.20240517'}
+)
 
-credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+response = service.monetization().onetimeproducts().batchUpdate(
+    packageName=package_name,
+    body=batch_request_body
+).execute()
 ```
-
-Use the `credentials` object to call Google APIs in your application.
-
-#### Using Domain-wide Delegation
-
-```python
-from google.oauth2 import service_account
-
-SCOPES = ['https://www.googleapis.com/auth/sqlservice.admin']
-SERVICE_ACCOUNT_FILE = '/path/to/service.json'
-
-credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES, subject='user@domain.com')
-```
-
-Use the `credentials` object to call Google APIs in your application. The API requests would be authorized as `user@domain.com`, if you've authorized the service account accordingly in the G Suite Admin console.
-
-
-## Calling Google APIs
-
-To call a Google API using the `Credentials` object, complete the following steps:
-
-1. Build a service object for the API that you want to call. You build a a service object by calling the build function with the name and version of the API and the authorized Http object. For example, to call version 1beta3 of the [Cloud SQL Administration API](https://cloud.google.com/sql/docs/admin-api/):
-
-    ```python
-    import googleapiclient.discovery
-
-    sqladmin = googleapiclient.discovery.build('sqladmin', 'v1beta3', credentials=credentials)
-    ```
-
-1. Make requests to the API service using the interface provided by the service object. For example, to list the instances of Cloud SQL databases in the example-123 project:
-
-    ```python
-    response = sqladmin.instances().list(project='example-123').execute()
-    ```
 
 ## Complete example
 
-The following example prints a JSON-formatted list of Cloud SQL instances in a project.
+See [samples/androidpublisher/example_custom_endpoint.py](../samples/androidpublisher/example_custom_endpoint.py) for a full working example, including the expected format of `serviceAccount.json` and error handling.
 
-```python
-from google.oauth2 import service_account
-import googleapiclient.discovery
+## Responses and troubleshooting
 
-SCOPES = ['https://www.googleapis.com/auth/sqlservice.admin']
-SERVICE_ACCOUNT_FILE = '/path/to/service.json'
+### Response codes
 
-credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-sqladmin = googleapiclient.discovery.build('sqladmin', 'v1beta3', credentials=credentials)
-response = sqladmin.instances().list(project='exemplary-example-123').execute()
+| Code | Meaning | Typical causes |
+|------|---------|----------------|
+| **200 OK** | Request processed successfully. | — |
+| **400 Bad Request** | Invalid payload / validation failure. | Missing required fields, invalid types/formats, business rules not met. |
+| **401 Unauthorized** | Authentication failure / invalid token. | Missing or malformed `Authorization` header; malformed JWT; invalid signature; unknown or revoked `kid`; expired token (`exp`); token validity &gt; 15 minutes (`exp - iat > 900`); `iat` too far in the future; missing or wrong `iss`/`sub` (must equal `clientId`). |
+| **403 Forbidden** | Token valid but caller lacks permission. | Client (`iss`/`sub`) not authorized for this endpoint; different access level required. |
+| **404 Not Found** | Resource not found. | Package not available for monetization, or package does not exist under your credentials. |
 
-print(response)
-```
+### Troubleshooting
+
+- **400** — Validate the request body against the endpoint’s expected schema.
+- **401 (invalid signature)** — Confirm `kid` matches the public key registered for your credentials; confirm the private key used to sign matches the server-side public key.
+- **401 (invalid issuer/subject)** — Confirm `iss` and `sub` are present and both equal to the `clientId` from `serviceAccount.json`.
+- **401 (expired token / TTL)** — Confirm `iat`/`exp` are Unix seconds; confirm `exp - iat <= 900`; ensure system clock is correct (NTP).
+- **403** — Confirm the permissions associated with your `clientId` at [developers.appning.com](https://developers.appning.com).
+- **404** — Confirm the package name and settings at [developers.appning.com](https://developers.appning.com).

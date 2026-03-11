@@ -35,6 +35,7 @@ import pickle
 import re
 import sys
 import unittest
+import warnings
 from unittest import mock
 import urllib
 
@@ -545,30 +546,38 @@ class DiscoveryErrors(unittest.TestCase):
                 static_discovery=False,
             )
 
+    # For Appning: obtain credentials from the Developer Portal (JWT Bearer),
+    # not via credentials_file or Application Default Credentials:
+    # https://developers.appning.com/backoffice/settings/api-access-credentials
+
     def test_credentials_file_and_http_mutually_exclusive(self):
         http = HttpMock(datafile("plus.json"), {"status": "200"})
         with self.assertRaises(ValueError):
-            build(
-                "plus",
-                "v1",
-                http=http,
-                client_options=google.api_core.client_options.ClientOptions(
-                    credentials_file="credentials.json"
-                ),
-                static_discovery=False,
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                build(
+                    "plus",
+                    "v1",
+                    http=http,
+                    client_options=google.api_core.client_options.ClientOptions(
+                        credentials_file="credentials.json"
+                    ),
+                    static_discovery=False,
+                )
 
     def test_credentials_and_credentials_file_mutually_exclusive(self):
         with self.assertRaises(google.api_core.exceptions.DuplicateCredentialArgs):
-            build(
-                "plus",
-                "v1",
-                credentials=mock.sentinel.credentials,
-                client_options=google.api_core.client_options.ClientOptions(
-                    credentials_file="credentials.json"
-                ),
-                static_discovery=False,
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                build(
+                    "plus",
+                    "v1",
+                    credentials=mock.sentinel.credentials,
+                    client_options=google.api_core.client_options.ClientOptions(
+                        credentials_file="credentials.json"
+                    ),
+                    static_discovery=False,
+                )
 
 
 class DiscoveryFromDocument(unittest.TestCase):
@@ -748,17 +757,25 @@ class DiscoveryFromDocument(unittest.TestCase):
 
         default.assert_called_once_with(scopes=None, quota_project_id="my-project")
 
+    # For Appning use JWT Bearer credentials from the Developer Portal, not
+    # credentials_file: https://developers.appning.com/backoffice/settings/api-access-credentials
+
     def test_credentials_file_from_client_options(self):
         discovery = read_datafile("plus.json")
 
         with mock.patch("googleapiclient._auth.credentials_from_file") as default:
             _reset_universe_domain(default.return_value)
-            plus = build_from_document(
-                discovery,
-                client_options=google.api_core.client_options.ClientOptions(
-                    credentials_file="credentials.json"
-                ),
-            )
+            with warnings.catch_warnings():
+                warnings.simplefilter(
+                    "ignore",
+                    DeprecationWarning,
+                )
+                plus = build_from_document(
+                    discovery,
+                    client_options=google.api_core.client_options.ClientOptions(
+                        credentials_file="credentials.json"
+                    ),
+                )
 
         default.assert_called_once_with(
             "credentials.json", scopes=None, quota_project_id=None
@@ -2745,6 +2762,7 @@ class Universe(unittest.TestCase):
         def test_client_options_universe_configured_with_mtls(self):
             fake_universe = "foo.com"
             discovery = read_datafile("tasks.json")
+            credentials = mock.Mock(spec=google.auth.credentials.Credentials)
 
             with self.assertRaises(MutualTLSChannelError):
                 with mock.patch.dict(
@@ -2752,6 +2770,7 @@ class Universe(unittest.TestCase):
                 ):
                     tasks = build_from_document(
                         discovery,
+                        credentials=credentials,
                         client_options=google.api_core.client_options.ClientOptions(
                             universe_domain=fake_universe
                         ),
@@ -2789,6 +2808,7 @@ class Universe(unittest.TestCase):
         def test_universe_env_var_configured_with_mtls(self):
             fake_universe = "foo.com"
             discovery = read_datafile("tasks.json")
+            credentials = mock.Mock(spec=google.auth.credentials.Credentials)
 
             with self.assertRaises(MutualTLSChannelError):
                 with mock.patch.dict(
@@ -2798,7 +2818,7 @@ class Universe(unittest.TestCase):
                         "GOOGLE_CLOUD_UNIVERSE_DOMAIN": fake_universe,
                     },
                 ):
-                    tasks = build_from_document(discovery)
+                    tasks = build_from_document(discovery, credentials=credentials)
 
         def test_universe_env_var_configured_with_api_override(self):
             fake_universe = "foo.com"

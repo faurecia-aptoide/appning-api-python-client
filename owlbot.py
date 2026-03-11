@@ -49,8 +49,7 @@ s.move(
 # Move scripts folder needed for samples CI
 s.move(templated_files / "scripts")
 
-# Copy CONTRIBUTING.rst
-s.move(templated_files / "CONTRIBUTING.rst")
+# CONTRIBUTING is CONTRIBUTING.md in this repo (not copied from template)
 
 # Copy configuration file for renovate
 s.move(templated_files / "renovate.json")

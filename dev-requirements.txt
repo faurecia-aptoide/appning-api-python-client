@@ -1,0 +1,14 @@
+# Test dependencies (mirrors noxfile.py test_dependencies).
+# Install with: pip install -r dev-requirements.txt
+# Then run: pytest tests/
+django>=2.0.0
+google-auth
+google-auth-httplib2
+mox
+parameterized
+pyopenssl
+cryptography>=38.0.3
+pytest
+pytest-cov
+webtest
+coverage
