@@ -142,8 +142,6 @@ def main():
     # 5. Prepare batch update request
     # ============================================================
     package_name = "com.example.app"
-    # Uncomment to use a real package name:
-    package_name = "com.soundcloud.android"
 
     batch_request_body = {
         "requests": [
