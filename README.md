@@ -77,12 +77,15 @@ from googleapiclient.http import set_user_agent
 from googleapiclient.jwt_bearer_credentials import JwtBearerCredentials
 
 service_account_file = 'serviceAccount.json'
+package_name = "com.example.app"
+
 if not os.path.exists(service_account_file):
     raise FileNotFoundError("serviceAccount.json not found. Obtain credentials from the developer portal.")
 
 with open(service_account_file, 'r') as f:
     data = json.load(f)
 cred_kwargs = {'kid': data['kid'], 'private_key_pem': data['privateKeyPem']}
+
 if data.get('clientId'):
     cred_kwargs['client_id'] = data['clientId']
 credentials = JwtBearerCredentials(**cred_kwargs)
@@ -92,8 +95,55 @@ base_http = set_user_agent(httplib2.Http(timeout=30), 'appning-api-python-client
 authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=base_http)
 
 service = build('androidpublisher', 'v3', http=authorized_http, client_options={'api_endpoint': custom_endpoint})
-package_name = "com.example.app"
-batch_request_body = {"requests": [{...}]}  # See sample for full body
+
+batch_request_body = {
+  "requests": [
+      {
+          "oneTimeProduct": {
+              "packageName": package_name,
+              "productId": f"coin_pack_etc_{int(time.time())}",
+              "listings": [
+                  {
+                      "languageCode": "pt-BR",
+                      "title": "300 Moedas",
+                      "description": "Receba 300 moedas instantaneamente"
+                  },
+                  {
+                      "languageCode": "en-US",
+                      "title": "300 Coins",
+                      "description": "Receive 300 coins instantly"
+                  }
+              ],
+              "purchaseOptions": [
+                  {
+                      "purchaseOptionId": "default",
+                      "buyOption": {
+                          "legacyCompatible": True,
+                          "multiQuantityEnabled": False
+                      },
+                      "regionalPricingAndAvailabilityConfigs": [
+                          {
+                              "regionCode": "US",
+                              "price": {
+                                  "currencyCode": "USD",
+                                  "units": "1",
+                                  "nanos": 880000000
+                              },
+                              "availability": "AVAILABLE"
+                          }
+                      ]
+                  }
+              ]
+          },
+          "updateMask": "listings,purchaseOptions",
+          "allowMissing": True,
+          "latencyTolerance": "PRODUCT_UPDATE_LATENCY_TOLERANCE_LATENCY_TOLERANT",
+          "regionsVersion": {
+              "version": "2025/03"
+          }
+      }
+  ]
+}
 
 response = service.monetization().onetimeproducts().batchUpdate(
     packageName=package_name, body=batch_request_body
