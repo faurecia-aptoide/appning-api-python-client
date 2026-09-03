@@ -8,6 +8,106 @@ All Appning endpoints are authenticated using **JWT Bearer tokens** signed local
 
 > This library is an **unofficial fork** of Google’s `google-api-python-client` library and is **maintained independently by Appning**. It is not an official Google product and is provided under the same Apache License 2.0 terms as the upstream project.
 
+## Appning API compatibility
+
+> **Read this before you write code for `oneTimeProducts`.** This client comes
+> from Google's Android Publisher discovery document, which Appning does not
+> change. Thus the client shows **17 operations** under
+> `monetization.onetimeproducts`. Appning has **one** of them. You can call the
+> other 16, but they give status 404.
+
+<!-- BEGIN onetimeproducts-compat -->
+
+**Direct methods on `onetimeproducts`**
+
+| Operation | Client call | Status |
+|---|---|---|
+| `batchUpdate` | `.monetization().onetimeproducts().batchUpdate()` | **Supported** |
+| `batchDelete` | `.monetization().onetimeproducts().batchDelete()` | Not implemented — 404 |
+| `batchGet` | `.monetization().onetimeproducts().batchGet()` | Not implemented — 404 |
+| `delete` | `.monetization().onetimeproducts().delete()` | Not implemented — 404 |
+| `get` | `.monetization().onetimeproducts().get()` | Not implemented — 404 |
+| `list` | `.monetization().onetimeproducts().list()` | Not implemented — 404 |
+| `patch` | `.monetization().onetimeproducts().patch()` | Not implemented — 404 |
+
+**Purchase options** — `.monetization().onetimeproducts().purchaseOptions()`
+
+| Operation | Client call | Status |
+|---|---|---|
+| `purchaseOptions.batchDelete` | `.purchaseOptions().batchDelete()` | Not implemented — 404 |
+| `purchaseOptions.batchUpdateStates` | `.purchaseOptions().batchUpdateStates()` | Not implemented — 404 |
+
+**Offers** — `.monetization().onetimeproducts().purchaseOptions().offers()`
+
+| Operation | Client call | Status |
+|---|---|---|
+| `purchaseOptions.offers.activate` | `.purchaseOptions().offers().activate()` | Not implemented — 404 |
+| `purchaseOptions.offers.batchDelete` | `.purchaseOptions().offers().batchDelete()` | Not implemented — 404 |
+| `purchaseOptions.offers.batchGet` | `.purchaseOptions().offers().batchGet()` | Not implemented — 404 |
+| `purchaseOptions.offers.batchUpdate` | `.purchaseOptions().offers().batchUpdate()` | Not implemented — 404 |
+| `purchaseOptions.offers.batchUpdateStates` | `.purchaseOptions().offers().batchUpdateStates()` | Not implemented — 404 |
+| `purchaseOptions.offers.cancel` | `.purchaseOptions().offers().cancel()` | Not implemented — 404 |
+| `purchaseOptions.offers.deactivate` | `.purchaseOptions().offers().deactivate()` | Not implemented — 404 |
+| `purchaseOptions.offers.list` | `.purchaseOptions().offers().list()` | Not implemented — 404 |
+
+<!-- END onetimeproducts-compat -->
+
+Do not call `purchaseOptions` or `offers` as resources. Appning accepts
+`purchaseOptions` only as a **field in the `batchUpdate` request body**.
+
+Appning has plans to add some of these operations. The plans have no release
+date. Use only the operations that this table shows as supported.
+
+### Two ways this fails quietly
+
+The two failures are different. Find which one you have first.
+
+**1. `GET`, `PUT` and `DELETE` on the `:batchUpdate` path give status 200 and
+change nothing.** The path `.../oneTimeProducts:batchUpdate` accepts four
+methods. Only `POST` does work. The other three methods are stubs. Appning keeps
+them for compatibility with the legacy service. They do not read or write data.
+
+If you send one of these three requests manually, the server gives status 200.
+Nothing changes. This library gives you an empty result, not a result object.
+`GET` gives `[]`. `PUT` and `DELETE` give `''`:
+
+```python
+# The server gives status 200. No data changed.
+response = ...                 # [] from GET, or '' from PUT and DELETE
+response["oneTimeProducts"]    # TypeError: string indices must be integers
+```
+
+This `TypeError` is usually the first symptom. The message does not show the
+cause. To change one-time products, use `POST` only. That is, use
+`batchUpdate()`.
+
+**2. `get`, `delete` and `list` give status 404.** These operations use a
+different path: `.../oneTimeProducts/{productId}`. Appning has no route for this
+path. These operations do not reach the stubs above. They raise `HttpError` with
+status 404. The other 13 unsupported operations do the same.
+
+A 404 here shows that Appning does not have this operation. It does not show a
+wrong package name. It does not show a permission problem. Look at the table
+above first.
+
+### Where this is specified
+
+The authoritative statement lives in the Appning API documentation. **Sign in to
+the [Developer Portal](https://developers.appning.com) first** — the API
+documentation is not readable anonymously.
+
+Then open
+[monetization.onetimeproducts](https://developers.appning.com/api-documentation/docs/appning/android-publisher/monetization.onetimeproducts/monetization.onetimeproducts.md),
+or navigate to it: **API Documentation → Appning → Android Publisher →
+`monetization.onetimeproducts`**.
+
+If this table and that page ever disagree, the documentation is correct and this
+table is stale. Please report it.
+
+> **Note on `list_next()`.** The library makes a `list_next()` pagination helper
+> for `list` and for `purchaseOptions.offers.list`. You cannot use either helper,
+> because Appning has neither `list` operation.
+
 ## Requirements
 
 - [Python 3.7 or higher](https://www.python.org/)
@@ -90,7 +190,7 @@ if data.get('clientId'):
     cred_kwargs['client_id'] = data['clientId']
 credentials = JwtBearerCredentials(**cred_kwargs)
 
-custom_endpoint = 'https://product.faa.faurecia-aptoide.com/api/8.20200601/'
+custom_endpoint = 'https://product.faa.faurecia-aptoide.com/api/8.20240517/'
 base_http = set_user_agent(httplib2.Http(timeout=30), 'appning-api-python-client/androidpublisher')
 authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=base_http)
 
@@ -154,9 +254,21 @@ response = service.monetization().onetimeproducts().batchUpdate(
 
 | Service          | Method | Description |
 |------------------|--------|-------------|
-| Android Publisher | POST   | Batch create/update one-time products (monetization): `applications/{packageName}/oneTimeProducts:batchUpdate` |
+| Android Publisher | POST   | Batch create/update one-time products (monetization): `androidpublisher/v3/applications/{packageName}/oneTimeProducts:batchUpdate` |
 
-The base URL for the Appning product API is typically `https://product.faa.faurecia-aptoide.com/api/8.20240517` (or the version your account uses). Set it via `client_options={'api_endpoint': '...'}` when building the service.
+This is the **only** `oneTimeProducts` operation that Appning has. The client
+shows 16 more operations, but they give status 404. Read
+[Appning API compatibility](#appning-api-compatibility) before you call them.
+
+The base URL for the Appning product API is
+`https://product.faa.faurecia-aptoide.com/api/8.20240517`, where the final
+segment is the API version your account uses. Set it via
+`client_options={'api_endpoint': '...'}` when building the service. The client
+appends `androidpublisher/v3/` itself, so a full request URL looks like:
+
+```
+https://product.faa.faurecia-aptoide.com/api/8.20240517/androidpublisher/v3/applications/{packageName}/oneTimeProducts:batchUpdate
+```
 
 ## Examples
 

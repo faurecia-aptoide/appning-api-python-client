@@ -47,7 +47,7 @@ service = build(
     'androidpublisher',
     'v3',
     http=authorized_http,
-    client_options={'api_endpoint': 'https://product.faa.faurecia-aptoide.com/api/8.20200601/'}
+    client_options={'api_endpoint': 'https://product.faa.faurecia-aptoide.com/api/8.20240517/'}
 )
 
 # Or default Google endpoint
